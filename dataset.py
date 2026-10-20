@@ -1,26 +1,26 @@
 """
-Shakespeare Veri Seti Modülü
+Shakespeare Dataset Module
 
-Bu modül Tiny Shakespeare veri setini yükler ve hazırlar.
-Basitlik için karakter bazlı tokenization kullanıyoruz.
+This module handles loading and preparing the Tiny Shakespeare dataset.
+We use character-level tokenization for simplicity.
 
-Temel Kavramlar:
-1. Tokenization - Karakterleri sayılara çevirme
-2. Train/Validation Ayrımı - Veriyi eğitim ve değerlendirme için ayırma
-3. Batch Üretimi - Eğitim için girdi-hedef çiftleri oluşturma
+Key Concepts:
+1. Tokenization - Converting characters to numbers
+2. Train/Validation Split - Separating data for training and evaluation
+3. Batch Generation - Creating input-target pairs for training
 """
 
 import os
 import urllib.request
 import torch
 
-# Tiny Shakespeare veri setinin URL'si (Andrej Karpathy'den fork'lanmış)
+# URL for the Tiny Shakespeare dataset (forked from Andrej Karpathy)
 SHAKESPEARE_URL = "https://raw.githubusercontent.com/atilsamancioglu/ShakespeareInput/refs/heads/main/input.txt"
 DATA_PATH = "data/shakespeare.txt"
 
 
 def download_shakespeare():
-    """Shakespeare veri setini, daha önce indirilmediyse indirir."""
+    """Download the Shakespeare dataset if not already present."""
     if os.path.exists(DATA_PATH):
         print(f"Dataset already exists at {DATA_PATH}")
         return
@@ -33,67 +33,67 @@ def download_shakespeare():
 
 class CharacterTokenizer:
     """
-    Karakter Bazlı Tokenizer
+    Character-level Tokenizer
 
-    Metni sayılara, sayıları da tekrar metne çevirir.
-    Her benzersiz karakter, benzersiz bir ID alır.
+    Converts text to numbers and back.
+    Each unique character gets a unique ID.
 
-    Örnek:
+    Example:
         'hello' -> [7, 4, 11, 11, 14]
         [7, 4, 11, 11, 14] -> 'hello'
 
     -------------------------------------------------------------------------
-    NEDEN KARAKTER BAZLI TOKENIZATION?
+    WHY CHARACTER-LEVEL TOKENIZATION?
     -------------------------------------------------------------------------
-    Eğitim açısından basit olduğu için karakter bazlı tokenization kullanıyoruz.
-    Endüstri modelleri (GPT, BERT) alt kelime (subword) tokenization kullanır
-    (BPE, WordPiece). Bu daha verimlidir ama karmaşıklık ekler.
+    We use character-level tokenization for educational simplicity.
+    Industry models (GPT, BERT) use subword tokenization (BPE, WordPiece)
+    which is more efficient but adds complexity.
 
-    ÖNEMLİ: Atadığımız tam sayı ID'leri KEYFİDİR, sadece birer indekstir!
-    Sinir ağı bu sayıları doğrudan "görmez". Bunun yerine:
+    IMPORTANT: The integer IDs we assign are ARBITRARY - they're just indices!
+    The neural network doesn't "see" these numbers directly. Instead:
 
-        Karakter → Tam Sayı ID → Embedding Katmanı → Öğrenilmiş Vektör
-           'h'   →      7      →    lookup[7]      → [0.23, -0.45, ...]
+        Character → Integer ID → Embedding Layer → Learned Vector
+           'h'    →     7      →   lookup[7]    → [0.23, -0.45, ...]
 
-    Embedding katmanı (nn.Embedding) ÖĞRENİLEBİLİR bir arama tablosudur.
-    Eğitim sırasında backpropagation bu vektörleri günceller; böylece
-    benzer bağlamlarda geçen karakterler benzer temsiller kazanır.
+    The embedding layer (nn.Embedding) is a LEARNABLE lookup table.
+    During training, backpropagation updates these vectors so that
+    characters appearing in similar contexts get similar representations.
 
-    Bu, Word2Vec ile aynı prensiptir: asıl "anlam" keyfi ID'de değil,
-    öğrenilmiş embedding vektöründedir.
+    This is the same principle as Word2Vec: the actual "meaning" is not in
+    the arbitrary ID, but in the learned embedding vector.
     -------------------------------------------------------------------------
     """
 
     def __init__(self, text: str):
-        # 1. Tüm benzersiz karakterleri al ve sırala
+        # 1. Get all unique characters and sort them
         self.characters = sorted(list(set(text)))
 
-        # 2. Sözlük boyutunu sakla
+        # 2. Store vocabulary size
         self.vocab_size = len(self.characters)
 
-        # 3. Karakter -> ID eşlemesini oluştur
+        # 3. Create character to ID mapping
         self.char_to_id = {}
         for index, char in enumerate(self.characters):
             self.char_to_id[char] = index
 
-        # 4. ID -> karakter eşlemesini oluştur
+        # 4. Create ID to character mapping
         self.id_to_char = {}
         for index, char in enumerate(self.characters):
             self.id_to_char[index] = char
 
-        # 5. Sözlük bilgisini yazdır
+        # 5. Print vocabulary info
         print(f"Vocabulary size: {self.vocab_size} characters")
         print(f"Characters: {repr(''.join(self.characters[:50]))}...")
 
     def encode(self, text: str) -> list:
-        """Metni tam sayı ID'lerinden oluşan bir listeye çevirir."""
+        """Convert text to list of integer IDs."""
         ids = []
         for char in text:
             ids.append(self.char_to_id[char])
         return ids
 
     def decode(self, ids: list) -> str:
-        """Tam sayı ID listesini tekrar metne çevirir."""
+        """Convert list of integer IDs back to text."""
         if isinstance(ids, torch.Tensor):
             ids = ids.tolist()
 
@@ -105,57 +105,57 @@ class CharacterTokenizer:
 
 def get_batch(data: torch.Tensor, block_size: int, batch_size: int):
     """
-    Rastgele bir eğitim verisi batch'i (grubu) üretir.
+    Generate a random batch of training data.
 
     -------------------------------------------------------------------------
-    DİL MODELİ EĞİTİMİ NASIL ÇALIŞIR
+    HOW LANGUAGE MODEL TRAINING WORKS
     -------------------------------------------------------------------------
-    Girdi-hedef çiftleri oluştururuz. HEDEF = GİRDİ'nin 1 pozisyon kaydırılmış hali.
-    Model, her pozisyonda bir SONRAKİ karakteri tahmin etmeyi öğrenir.
+    We create input-target pairs where TARGET = INPUT shifted by 1 position.
+    The model learns to predict the NEXT character at each position.
 
-    block_size=5 ile örnek:
+    Example with block_size=5:
 
-        Metin: "To be or not to be"
+        Text: "To be or not to be"
 
-        1. Rastgele bir başlangıç pozisyonu seç, (block_size + 1) karakter al:
-           chunk = ['T', 'o', ' ', 'b', 'e', ' ']   (6 karakter)
+        1. Pick random starting position, grab (block_size + 1) characters:
+           chunk = ['T', 'o', ' ', 'b', 'e', ' ']   (6 chars)
 
-        2. Girdi (x) ve hedef (y) olarak ayır:
-           x = ['T', 'o', ' ', 'b', 'e']     (ilk 5 karakter)
-           y = ['o', ' ', 'b', 'e', ' ']     (son 5 karakter = 1 kaydırılmış)
+        2. Split into input (x) and target (y):
+           x = ['T', 'o', ' ', 'b', 'e']     (first 5 chars)
+           y = ['o', ' ', 'b', 'e', ' ']     (last 5 chars = shifted by 1)
 
-        3. Model şunları tahmin etmeyi öğrenir:
-           'T' verilince       → 'o' tahmin et
-           'To' verilince      → ' ' tahmin et
-           'To ' verilince     → 'b' tahmin et
-           'To b' verilince    → 'e' tahmin et
-           'To be' verilince   → ' ' tahmin et
+        3. The model learns to predict:
+           Given 'T'       → predict 'o'
+           Given 'To'      → predict ' '
+           Given 'To '     → predict 'b'
+           Given 'To b'    → predict 'e'
+           Given 'To be'   → predict ' '
 
-    Bu işlem, birden fazla rastgele pozisyon için (batch_size kadar) aynı anda yapılır.
+    This is done for multiple random positions (batch_size) at once.
     -------------------------------------------------------------------------
 
     Args:
-        data: Tüm token ID'lerini içeren tensör
-        block_size: Her dizinin uzunluğu
-        batch_size: Bir batch'teki dizi sayısı
+        data: Tensor of all token IDs
+        block_size: Length of each sequence
+        batch_size: Number of sequences per batch
 
     Returns:
-        x: Girdi dizileri, şekil (batch_size, block_size)
-        y: Hedef dizileri, şekil (batch_size, block_size)
+        x: Input sequences, shape (batch_size, block_size)
+        y: Target sequences, shape (batch_size, block_size)
     """
-    # 1. Rastgele başlangıç pozisyonları seç
+    # 1. Pick random starting positions
     max_start = len(data) - block_size - 1
     positions = torch.randint(max_start, (batch_size,))
 
-    # 2. Her pozisyon için girdi (x) ve hedef (y) çıkar
+    # 2. Extract input (x) and target (y) for each position
     x_list = []
     y_list = []
 
     for pos in positions:
-        x_list.append(data[pos : pos + block_size])        # Girdi: 0'dan n-1'e kadar karakterler
-        y_list.append(data[pos + 1 : pos + block_size + 1])  # Hedef: 1'den n'e kadar karakterler (1 kaydırılmış)
+        x_list.append(data[pos : pos + block_size])        # Input: chars 0 to n-1
+        y_list.append(data[pos + 1 : pos + block_size + 1])  # Target: chars 1 to n (shifted by 1)
 
-    # 3. Batch tensörlerine birleştir (stack): (batch_size, block_size)
+    # 3. Stack into batch tensors: (batch_size, block_size)
     x = torch.stack(x_list)
     y = torch.stack(y_list)
 
@@ -164,21 +164,21 @@ def get_batch(data: torch.Tensor, block_size: int, batch_size: int):
 
 def load_data(block_size: int = 256, train_split: float = 0.9):
     """
-    Shakespeare veri setini yükler ve hazırlar.
+    Load and prepare the Shakespeare dataset.
 
     Args:
-        block_size: Her dizinin uzunluğu
-        train_split: Eğitim için ayrılan veri oranı (kalanı validation olur)
+        block_size: Length of each sequence
+        train_split: Fraction of data for training (rest is validation)
 
     Returns:
-        train_data: Eğitim token ID'leri (tensör)
-        val_data: Validation token ID'leri (tensör)
-        tokenizer: Karakter tokenizer'ı
+        train_data: Training token IDs as tensor
+        val_data: Validation token IDs as tensor
+        tokenizer: The character tokenizer
     """
-    # 1. Veri setini indir
+    # 1. Download the dataset
     download_shakespeare()
 
-    # 2. Metin dosyasını oku
+    # 2. Load the text file
     with open(DATA_PATH, 'r', encoding='utf-8') as file:
         text = file.read()
 
@@ -186,14 +186,14 @@ def load_data(block_size: int = 256, train_split: float = 0.9):
     print(f"Sample text:\n{text[:200]}")
     print("..." + "-" * 50)
 
-    # 3. Tokenizer'ı oluştur
+    # 3. Create the tokenizer
     tokenizer = CharacterTokenizer(text)
 
-    # 4. Tüm metni token ID'lerine çevir
+    # 4. Encode the entire text to token IDs
     all_ids = tokenizer.encode(text)
     data = torch.tensor(all_ids, dtype=torch.long)
 
-    # 5. Eğitim ve validation setlerine ayır
+    # 5. Split into training and validation sets
     split_index = int(train_split * len(data))
     train_data = data[:split_index]
     val_data = data[split_index:]
@@ -204,20 +204,20 @@ def load_data(block_size: int = 256, train_split: float = 0.9):
     return train_data, val_data, tokenizer
 
 
-# Veri setini test et
+# Test the dataset
 if __name__ == "__main__":
-    # 1. Veriyi yükle
+    # 1. Load data
     train_data, val_data, tokenizer = load_data(block_size=128)
 
-    # 2. Örnek bir batch al
+    # 2. Get a sample batch
     x, y = get_batch(train_data, block_size=128, batch_size=4)
 
-    #print(f"\nSample batch:")
+    print(f"\nSample batch:")
     print(f"  Input shape: {x.shape}")
     print(f"  Target shape: {y.shape}")
 
-    # 3. Girdi-hedef ilişkisini göster
-    #print(f"\n--- Demonstrating input-target pairs ---")
-    #print(f"Input (x[0]):  {tokenizer.decode(x[0][:20])}")
-    #print(f"Target (y[0]): {tokenizer.decode(y[0][:20])}")
-    #print(f"Notice: target is input shifted by 1 character!")
+    # 3. Show the input-target relationship
+    print(f"\n--- Demonstrating input-target pairs ---")
+    print(f"Input (x[0]):  {tokenizer.decode(x[0][:20])}...")
+    print(f"Target (y[0]): {tokenizer.decode(y[0][:20])}...")
+    print(f"Notice: target is input shifted by 1 character!")

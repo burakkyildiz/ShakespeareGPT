@@ -16,23 +16,24 @@ import torch
 from model import GPT
 from dataset import load_data, get_batch
 
+
 # ==============================================================================
 # Hyperparameters (Settings)
 # ==============================================================================
 
 # Model architecture
-EMBEDDING_DIM = 384  # Size of embeddings (how big each vector is)
-NUM_HEADS = 6  # Number of attention heads
-NUM_LAYERS = 6  # Number of transformer blocks
-BLOCK_SIZE = 256  # Maximum sequence length
-DROPOUT = 0.1  # Dropout rate for regularization
+EMBEDDING_DIM = 384    # Size of embeddings (how big each vector is)
+NUM_HEADS = 6          # Number of attention heads
+NUM_LAYERS = 6         # Number of transformer blocks
+BLOCK_SIZE = 256       # Maximum sequence length
+DROPOUT = 0.1          # Dropout rate for regularization
 
 # Training settings
-BATCH_SIZE = 64  # Number of sequences per batch
-MAX_ITERS = 5000  # Total training iterations
-EVAL_INTERVAL = 500  # Evaluate every N iterations
-LEARNING_RATE = 3e-4  # Learning rate
-WARMUP_ITERS = 100  # Warmup iterations (gradually increase LR)
+BATCH_SIZE = 64        # Number of sequences per batch
+MAX_ITERS = 5000       # Total training iterations
+EVAL_INTERVAL = 500    # Evaluate every N iterations
+LEARNING_RATE = 3e-4   # Learning rate
+WARMUP_ITERS = 100     # Warmup iterations (gradually increase LR)
 
 # System
 DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
