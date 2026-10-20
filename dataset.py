@@ -212,12 +212,12 @@ if __name__ == "__main__":
     # 2. Örnek bir batch al
     x, y = get_batch(train_data, block_size=128, batch_size=4)
 
-    print(f"\nSample batch:")
+    #print(f"\nSample batch:")
     print(f"  Input shape: {x.shape}")
     print(f"  Target shape: {y.shape}")
 
     # 3. Girdi-hedef ilişkisini göster
-    print(f"\n--- Demonstrating input-target pairs ---")
-    print(f"Input (x[0]):  {tokenizer.decode(x[0][:20])}")
-    print(f"Target (y[0]): {tokenizer.decode(y[0][:20])}")
-    print(f"Notice: target is input shifted by 1 character!")
+    #print(f"\n--- Demonstrating input-target pairs ---")
+    #print(f"Input (x[0]):  {tokenizer.decode(x[0][:20])}")
+    #print(f"Target (y[0]): {tokenizer.decode(y[0][:20])}")
+    #print(f"Notice: target is input shifted by 1 character!")

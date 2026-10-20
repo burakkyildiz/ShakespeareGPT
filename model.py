@@ -74,7 +74,7 @@ class GPT(nn.Module):
         self.apply(self._init_weights)
 
         total_params = sum(p.numel() for p in self.parameters())
-        print(f"GPT model created with {total_params:,} parameters")
+        #print(f"GPT model created with {total_params:,} parameters")
 
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
@@ -103,7 +103,7 @@ class GPT(nn.Module):
         x = self.ln_final(x)
 
         logits = self.output_proj(x)
-        print(f'logits shape {logits.shape}')
+        #print(f'logits shape {logits.shape}')
         # ([4, 256, 65]) -> batch_size, block_size, vocab_size
 
         # logit shape = (batch_size, seq_len, vocab_size)->(batch_size * seq_len, vocab_size)
@@ -115,8 +115,8 @@ class GPT(nn.Module):
             targets_flat = targets.reshape(batch_size * seq_len, )
             loss = self.loss_fn(logits_flat, targets_flat)
 
-        print(loss)
-        print(logits)
+        #print(loss)
+        #print(logits)
         return logits, loss
 
     @torch.no_grad()
